@@ -1,0 +1,143 @@
+---
+title: "Sampling Station Exploration"
+output: html_document
+date: "latest update 2023-05-31"
+---
+
+I'm breaking down counts by region to ensure we don't inadvertently leave out a certain area that might be "younger" with whatever time period we determine is enough for long-term analyses.  
+
+Per Melissa, the regions in this spreadsheet are primarily for internal use. And I'm only using them illustratively here, not analytically.  
+
+Also per Melissa, the regions are:  
+
+No. | Region | Reserves |  
+:--: | :---- | :---- | 
+0 | Northeast | GRB, HUD, NAR, WQB, Wells | 
+1 | Mid Atlantic | CBM, CBV, DEL, JAC | 
+2 | Southeast | ACE, GTM, NC, NIW, SAP | 
+3 | Caribbean | JOB | 
+4 | GOM | APA, GND, MAR, RKB, WKB | 
+5 | Great Lakes | OWC, LKS | 
+6 | West Coast | ELK, HEE, KAC, PDB, SFB, SOS, TJR | 
+
+***  
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+mdat <- readr::read_csv(here::here("metadata", "sampling_stations.csv")) %>%
+    janitor::clean_names()
+```
+
+```{r}
+mdat <- mdat %>% 
+    select(-row, -lat_long) %>% 
+    separate(active_dates, into = c("start_date", "end_date"),
+             sep = "-") %>% 
+    mutate(station_type = as.character(station_type),
+           station_type = case_match(station_type,
+                                     "0" ~ "met",
+                                     "1" ~ "wq",
+                                     "2" ~ "nut"),
+           is_swmp = case_match(is_swmp,
+                                "P" ~ "Primary",
+                                "S" ~ "Secondary"),
+           region = as.character(region),
+           region = case_when(region == "7" ~ "6",  # 7 is legacy coding and should be 6 
+                              .default = region),
+           region2 = case_match(region,
+                               "0" ~ "0: Northeast",
+                               "1" ~ "1: Mid-Atlantic",
+                               "2" ~ "2: Southeast",
+                               "3" ~ "3: Caribbean",
+                               "4" ~ "4: Gulf of Mexico",
+                               "5" ~ "5: Great Lakes",
+                               "6" ~ "6: West Coast"),   
+           state = toupper(state))
+
+active <- mdat %>% 
+    filter(status == "Active") %>% 
+    mutate(starts = lubridate::decimal_date(lubridate::my(start_date)),
+           years_monitored = round(2023.0 - starts, 2))
+```
+
+```{r}
+ggplot(filter(active, station_type != "nut")) +
+    geom_histogram(aes(x = years_monitored, 
+                       fill = is_swmp),
+                   col = "gray40") +
+    geom_vline(xintercept = c(10, 15),
+               col = "blue",
+               linetype = "dashed") +
+    facet_grid(region ~ station_type) +
+    labs(title = "WQ and MET stations, by region",
+         subtitle = "blue dashed lines at 10y and 15y",
+         x = "Years monitored",
+         y = "# of stations",
+         fill = "") +
+    theme_bw()
+```
+
+```{r}
+ggplot(filter(active, station_type == "nut")) +
+    geom_histogram(aes(x = years_monitored, fill = is_swmp),
+                   col = "gray40") +
+    geom_vline(xintercept = c(10, 15),
+               col = "blue",
+               linetype = "dashed") +
+    facet_wrap(~region2) +
+    labs(title = "NUT stations, by region",
+         subtitle = "blue dashed lines at 10y and 15y",
+         x = "Years monitored",
+         y = "# of stations",
+         fill = "") +
+    theme_bw()
+```
+
+```{r}
+summ <- active %>% 
+    select(-region) %>% 
+    rename(region = region2) %>% 
+    mutate(yrs = case_when(years_monitored  < 10 ~ "<10",
+                           years_monitored >=15 ~ ">15",
+                            .default = "10-15")) %>% 
+    group_by(station_type, yrs, region) %>% 
+    tally()
+
+summ2 <- summ %>% 
+    pivot_wider(names_from = yrs,
+                values_from = n,
+                values_fill = 0) %>% 
+    arrange(station_type, region) %>% 
+    relocate(`10-15`, .before = `>15`)
+```
+
+```{r}
+library(kableExtra)
+
+summ2 %>% 
+    ungroup() %>% 
+    select(-station_type) %>% 
+    kbl(align = "lccc",
+        caption ="Length of SWMP monitoring by station type and region") %>%
+    kable_paper(full_width = F, position = "left") %>%
+    add_header_above(c(" " = 1, "Years Monitored" = 3)) %>% 
+    pack_rows("MET",
+               start_row = 1,
+               end_row = 7) %>% 
+    pack_rows("NUT",
+               start_row = 8,
+               end_row = 14) %>% 
+    pack_rows("WQ",
+               start_row = 15,
+               end_row = 21) %>% 
+    footnote(general = "Years Monitored calculated by subtracting the starting month/year for each station from the end of 2022.")
+```
+
+
