@@ -71,6 +71,9 @@ qaqc_monthly <- qaqc_long %>%
     group_by(Year, Month, parameter, flag_detailed) %>% 
     tally()
 
+# manual color palette - still needs some work, and needs to be made colorblind friendly
+# for now just trying to get "probably okay" to mostly be gray
+# suspect and rejected really stand out
 cols <- c("Passed QAQC" = "gray",
           "Calculated from other Params" = "gray",
           "Pre-auto QAQC" = "gray40",
@@ -107,19 +110,33 @@ test2 <- qaqc_long %>%
 
 
 # more of a heat plot
-# really, really slow
+# can be really, really slow
 
-p <- ggplot(filter(test2, parameter = "f_ph")) +
+
+p <- ggplot(filter(test2, parameter == "f_ph")) +
     geom_tile(aes(x = frac.year, y = Year, fill = flag_detailed),
               width = 0.00008) +
     scale_fill_manual(values = cols) +
-    labs(title = "Bangs Lake pH flags",
-         x = "Part of Year (0 = Jan 1, 1 = Dec 31)",
+    labs(title = "Bangs Lake pH mg/L flags",
+         x = "Part of Year (0 = Jan 1; 1 = Dec 31)",
          y = "Year",
          fill = "QA/QC Flag") +
     theme_bw()
 
 p
+
+
+p2 <- ggplot(filter(test2, parameter == "f_do_mgl")) +
+    geom_tile(aes(x = frac.year, y = Year, fill = flag_detailed),
+              width = 0.00008) +
+    scale_fill_manual(values = cols) +
+    labs(title = "Bangs Lake DO mg/L flags",
+         x = "Part of Year (0 = Jan 1; 1 = Dec 31)",
+         y = "Year",
+         fill = "QA/QC Flag") +
+    theme_bw()
+
+p2
     
 # p + khroma::scale_fill_bright()
 # p + khroma::scale_fill_okabeito()
