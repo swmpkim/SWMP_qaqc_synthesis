@@ -38,7 +38,7 @@ qaqcSumm_long <- qaqc_summ %>%
     group_by(flag, param) %>% 
     summarize(count = sum(count, na.rm = TRUE))
 
-ggplot(qaqc_long) +
+ggplot(qaqcSumm_long) +
     geom_col(aes(x = param, y = count, fill = flag)) +
     scale_fill_brewer(type = "qual", palette = "Paired") +
     theme_bw()
@@ -101,79 +101,32 @@ ggplot(filter(qaqc_monthly, parameter == "f_do_mgl")) +
     labs(title = "Bangs Lake DO(mg/L) QAQC flags, faceted by month")
 
 
-test2 <- test %>% 
-    mutate(Year = lubridate::year(datetimestamp),
-           dec.year = lubridate::decimal_date(datetimestamp),
+test2 <- qaqc_long %>% 
+    mutate(dec.year = lubridate::decimal_date(datetimestamp),
            frac.year = dec.year - Year)
 
-ggplot(test2) +
-    geom_point(aes(x = frac.year, y = Year, col = flag)) +
-    scale_color_brewer(palette = "Paired")
 
-# wq
-# really only width that depends on type of data?
-ggplot(test2) +
-    geom_tile(aes(x = frac.year, y = Year, fill = flag),
+# more of a heat plot
+# really, really slow
+
+p <- ggplot(filter(test2, parameter = "f_ph")) +
+    geom_tile(aes(x = frac.year, y = Year, fill = flag_detailed),
               width = 0.00008) +
-    scale_fill_brewer(palette = "Paired") +
+    scale_fill_manual(values = cols) +
+    labs(title = "Bangs Lake pH flags",
+         x = "Part of Year (0 = Jan 1, 1 = Dec 31)",
+         y = "Year",
+         fill = "QA/QC Flag") +
     theme_bw()
 
-
-p <- ggplot(test2) +
-    geom_tile(aes(x = frac.year, y = Year, fill = flag),
-              width = 0.00008)
+p
     
-p + khroma::scale_fill_bright()
-p + khroma::scale_fill_okabeito()
+# p + khroma::scale_fill_bright()
+# p + khroma::scale_fill_okabeito()
 
 
-test3 <- test2 %>% 
-    mutate(flag2 = case_match(flag,
-                              "<1>" ~ "SorR",
-                              "<-3>" ~ "SorR",
-                              "<0>" ~ "okay",
-                              .default = "other"))
-ggplot(test3) +
-    geom_tile(aes(x = frac.year, y = Year, fill = flag2),
-              width = 0.00008) +
-    khroma::scale_fill_okabeito()
 
 # save(test4, file = here::here("data", "aa_gndbl.RData"))
 
 
-test4 <- test2 %>% 
-    filter(flag != "<0>")
 
-ggplot(test4) +
-    geom_tile(aes(x = frac.year, y = Year, fill = flag),
-              width = 0.00008) +
-    khroma::scale_fill_okabeito()
-
-
-qaqc_monthly <- qaqc_only %>% 
-    mutate(Year = lubridate::year(datetimestamp),
-           Month = lubridate::month(datetimestamp),
-           Day = lubridate::mday(datetimestamp)) %>% 
-    pivot_longer(cols = starts_with("f_"),
-                 names_to = "parameter",
-                 values_to = "flag-code") %>% 
-    separate(`flag-code`, 
-             into = c("flag", "code"),
-             sep = " ",
-             extra = "merge",
-             fill = "right")
-
-totest <- qaqc_only %>% 
-    mutate(Year = lubridate::year(datetimestamp),
-           Month = lubridate::month(datetimestamp),
-           Day = lubridate::mday(datetimestamp)) %>% 
-    pivot_longer(cols = starts_with("f_"),
-                 names_to = "parameter",
-                 values_to = "flag-code")    
-
-moretest <- moretest %>% 
-    mutate(ph_flag = stringr::str_extract(f_ph, "<-?\\d>"))
-
-
-tested <- totest %>% 
-    mutate(flag = extract_flag(`flag-code`))
